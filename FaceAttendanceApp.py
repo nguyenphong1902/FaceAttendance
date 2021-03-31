@@ -1,8 +1,10 @@
+# pyinstaller --onedir --icon=icon.ico --clean --noconfirm FaceAttendanceApp.py
 import os
 import shutil
 import time
 import glob
 import threading
+from sys import exit
 from datetime import datetime, timedelta
 import cv2
 import csv
@@ -12,14 +14,15 @@ from tkinter import *
 from tkinter import messagebox, filedialog
 from tkcalendar import *
 import tkinter.ttk as ttk
+# os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 from configparser import ConfigParser
 import pyttsx3 as pyttsx
-import sklearn.utils._weight_vector # use when build .exe with pyinstaller
-import babel.numbers                # use when build .exe with pyinstaller
-import pyttsx3.drivers              # use when build .exe with pyinstaller
-import pyttsx3.drivers.sapi5        # use when build .exe with pyinstaller
-
+import numpy as np
+import sklearn.utils._weight_vector  # use when build .exe with pyinstaller
+import babel.numbers  # use when build .exe with pyinstaller
+import pyttsx3.drivers  # use when build .exe with pyinstaller
+import pyttsx3.drivers.sapi5  # use when build .exe with pyinstaller
 from face_mask_filter import add_face_mask, device_list
 from FaceClassifier import FaceClassifier
 from VideoCapture import MyVideoCapture
@@ -27,7 +30,6 @@ from FaceRecognition import FaceRecognition
 from language import languages
 from model import Attendance, Timekeeping, engine, session, Employee
 
-# scheduler = BackgroundScheduler()
 pygame.mixer.init()
 config_file = 'config.ini'
 config = ConfigParser()
@@ -113,6 +115,7 @@ class FaceAttendanceApp:
         self.get_employee_from_db()
         self.mute_tts = False
         self.speak_lock = threading.Lock()
+        self.emp_notify_lang = ''
 
         # Video Capture
         self.vids = [MyVideoCapture(video_source=0, width=self.cam_resolution[0], height=self.cam_resolution[1]),
@@ -177,8 +180,6 @@ class FaceAttendanceApp:
         self.bottom_frame_facerecog.rowconfigure(0, weight=1)
         self.bottom_frame_facerecog.columnconfigure(0, weight=1)
 
-        # self.btnFaceRecog = Button(self.tabFaceRecog, text='Start', command=self.btn_FaceRecog_pressed)
-        # self.btnFaceRecog.pack_forget()
         self.btnRefreshFR = ttk.Button(self.top_frame_facerecog, text=languages[self.lang]['btn_refresh'],
                                        command=self.btnRefreshFRPressed)
         self.btnRefreshFR.grid(row=0, column=2, sticky=W, padx=10)
@@ -213,34 +214,35 @@ class FaceAttendanceApp:
         self.canvas_addface.pack(fill=BOTH, expand=YES)
 
         self.cam_capture_id = StringVar()
-        self.cam_capture_id.set('0-' + device_list[0])
         self.cbb_chose_cam_capture = ttk.Combobox(self.right_frame_addface, width=12, textvariable=self.cam_capture_id)
-        self.cbb_chose_cam_capture['values'] = ('0-' + device_list[0], '1-' + device_list[1])
+        if len(device_list) >= 2:
+            self.cam_capture_id.set('0-' + device_list[0])
+            self.cbb_chose_cam_capture['values'] = ('0-' + device_list[0], '1-' + device_list[1])
         self.cbb_chose_cam_capture.bind('<<ComboboxSelected>>', self.cam_capture_id_changed)
         self.cbb_chose_cam_capture.grid(row=0, column=0)
         self.lblRecord = Label(self.right_frame_addface, text=languages[self.lang]['lbl_record'])
         self.lblRecord.grid(row=1, column=0, sticky=E)
         self.entrRecord = Entry(self.right_frame_addface, width=4, borderwidth=2)
         self.entrRecord.insert(END, str(self.record_total))
-        self.entrRecord.grid(row=1, column=1, sticky=N, padx=10, pady=10)
+        self.entrRecord.grid(row=1, column=1, sticky=N, pady=10)
         self.btnRecord = ttk.Button(self.right_frame_addface, text=languages[self.lang]['btn_record'],
                                     command=self.btnRecordPressed)
-        self.btnRecord.grid(row=2, column=0, sticky=N, padx=10, pady=10, columnspan=2)
+        self.btnRecord.grid(row=2, column=0, sticky=N, pady=10, columnspan=2)
         self.btnTrain = ttk.Button(self.right_frame_addface, text=languages[self.lang]['btn_train'],
                                    command=self.btnTrainPressed)
-        self.btnTrain.grid(row=3, column=0, sticky=S, padx=10, pady=10, columnspan=2)
+        self.btnTrain.grid(row=3, column=0, sticky=S, pady=10, columnspan=2)
         self.btnReTrainAll = ttk.Button(self.right_frame_addface, text=languages[self.lang]['btn_retrain_all'],
                                         command=self.btnReTrainAllPressed)
-        self.btnReTrainAll.grid(row=4, column=0, sticky=S, padx=10, pady=10, columnspan=2)
+        self.btnReTrainAll.grid(row=4, column=0, sticky=S, pady=10, columnspan=2)
         self.btnDelete = ttk.Button(self.right_frame_addface, text=languages[self.lang]['btn_delete'],
                                     command=self.btnDeletePressed)
-        self.btnDelete.grid(row=5, column=0, padx=10, pady=10)
+        self.btnDelete.grid(row=5, column=0, pady=10)
         self.name_to_del = StringVar()
-        self.cbb_chose_delete = ttk.Combobox(self.right_frame_addface, width=12, textvariable=self.name_to_del)
+        self.cbb_chose_delete = ttk.Combobox(self.right_frame_addface, width=18, textvariable=self.name_to_del)
         self.cbb_chose_delete['values'] = [name for name in os.listdir(self.data_folder) if
                                            os.path.isdir(os.path.join(self.data_folder, name))]
         self.cbb_chose_delete.bind('<Button-1>', self.on_cbb_del_clicked)
-        self.cbb_chose_delete.grid(row=5, column=1, padx=10, pady=10)
+        self.cbb_chose_delete.grid(row=5, column=1, pady=10)
 
         self.scroll_console = Scrollbar(self.bottom_frame_addface, orient=VERTICAL)
         self.scroll_console.pack(side=RIGHT, fill=Y)
@@ -278,7 +280,7 @@ class FaceAttendanceApp:
         self.lbl_chose_name = Label(self.top_frame_attend, text=languages[self.lang]['lbl_name'])
         self.lbl_chose_name.grid(row=0, column=7, sticky=E, padx=(20, 0))
         self.name_filter = StringVar()
-        self.cbb_chose_name = ttk.Combobox(self.top_frame_attend, width=12, textvariable=self.name_filter)
+        self.cbb_chose_name = ttk.Combobox(self.top_frame_attend, width=18, textvariable=self.name_filter)
 
         self.cbb_chose_name.bind('<Button-1>', self.cbb_chose_name_clicked)
         self.name_filter.set('All')
@@ -304,13 +306,21 @@ class FaceAttendanceApp:
         lab_id.grid(row=0, column=2, padx=10, pady=10)
         txtBox_id = Entry(input_name, width=20, borderwidth=2)
         txtBox_id.grid(row=0, column=3, padx=10, pady=10)
+        lbl_notify_lang = Label(input_name, text=languages[self.lang]['lbl_language'])
+        lbl_notify_lang.grid(row=0, column=4, sticky=E)
+        notify_lang = StringVar()
+        cbb_notify_lang = ttk.Combobox(input_name, width=5, textvariable=notify_lang)
+        cbb_notify_lang['values'] = list(self.lang_options)
+        notify_lang.set('VN')
+        cbb_notify_lang.grid(row=0, column=5, pady=10)
+
         btnOkay = ttk.Button(input_name, text=languages[self.lang]['popup_btn_okay'],
-                             command=lambda: [self.get_person_name(txtBox.get(), txtBox_id.get()),
+                             command=lambda: [self.get_person_name(txtBox.get(), txtBox_id.get(), notify_lang.get()),
                                               input_name.destroy(),
                                               self.save_image()])
-        btnOkay.grid(row=1, column=2, padx=10, pady=10, sticky=E)
+        btnOkay.grid(row=1, column=3, padx=10, pady=10, sticky=E)
         btnCancel = ttk.Button(input_name, text=languages[self.lang]['popup_btn_cancel'], command=input_name.destroy)
-        btnCancel.grid(row=1, column=3, padx=10, pady=10, sticky=E)
+        btnCancel.grid(row=1, column=5, padx=10, pady=10, sticky=E)
         w = self.root.winfo_width()
         h = self.root.winfo_height()
         wf = input_name.winfo_width()
@@ -328,9 +338,10 @@ class FaceAttendanceApp:
         fr_cam_setting = LabelFrame(self.settings, text=languages[self.lang]['lblfr_cam_setting'])
         lbl_chose_cam = Label(fr_cam_setting, text=languages[self.lang]['lbl_chose_cam'], font=12)
         self.cam_id = StringVar()
-        self.cam_id.set('0-' + device_list[0])
         self.cbb_chose_cam = ttk.Combobox(fr_cam_setting, width=12, textvariable=self.cam_id)
-        self.cbb_chose_cam['values'] = ('0-' + device_list[0], '1-' + device_list[1])
+        if len(device_list) >= 2:
+            self.cam_id.set('0-' + device_list[0])
+            self.cbb_chose_cam['values'] = ('0-' + device_list[0], '1-' + device_list[1])
         self.cbb_chose_cam.bind('<<ComboboxSelected>>', self.cam_id_changed)
         self.r = StringVar()
         self.r.set(self.cam_pos[0])
@@ -495,16 +506,17 @@ class FaceAttendanceApp:
                 writer.writerow(row)
 
     def btnDeletePressed(self):
-        if self.name_to_del.get() == '':
+        folder = self.name_to_del.get()
+        if folder == '':
             return
         try:
-            shutil.rmtree(os.path.join(self.data_folder, self.name_to_del.get()))
+            shutil.rmtree(os.path.join(self.data_folder, folder))
             emp_id = self.name_to_del.get().split('_ID_')[1]
             with engine.connect() as con:
                 con.execute('''DELETE FROM Employee WHERE id = '{}' '''.format(emp_id))
-            self.write('Delete successful: {}'.format(os.path.join(self.data_folder, self.name_to_del.get())))
-            # self.cbb_chose_delete['values'] = [name for name in os.listdir(self.data_folder) if
-            #                                    os.path.isdir(os.path.join(self.data_folder, name))]
+            self.write('Delete successful: {}'.format(os.path.join(self.data_folder, folder)))
+            if folder in self.modified_folder:
+                self.modified_folder.remove(folder)
         except OSError as e:
             self.write("Error: %s - %s." % (e.filename, e.strerror))
 
@@ -527,19 +539,22 @@ class FaceAttendanceApp:
     def btnShowAttendPressed(self):
         date_from = self.dtentry_from.get()
         date_to = self.dtentry_to.get()
-        name = self.name_filter.get()
+        namenid = self.name_filter.get()
         self.tblAttend.delete(*self.tblAttend.get_children())
         frame_width = self.bottom_frame_attend.winfo_width()
         with engine.connect() as con:
-            if name == 'All' or name == '':
+            if namenid == 'All' or namenid == '':
                 rs = con.execute('''SELECT * FROM Timekeeping
                                  WHERE date BETWEEN '{}' AND '{}'
                                  '''.format(date_from, date_to))
             else:
+                name = namenid.split('_ID_')[0]
+                emp_id = namenid.split('_ID_')[1]
                 rs = con.execute('''SELECT * FROM Timekeeping
                              WHERE date BETWEEN '{}' AND '{}'
                              AND name = '{}'
-                             '''.format(date_from, date_to, name))
+                             AND employeeID = '{}'
+                             '''.format(date_from, date_to, name, emp_id))
             createCols = True
             self.table.clear()
             for row in rs:
@@ -561,7 +576,6 @@ class FaceAttendanceApp:
 
     def btnRefreshFRPressed(self):
         self.stop_face_recog()
-        # self.stop_update_frame_facerecog = True
         time.sleep(0.5)
         self.fr.load_model()
         self.name_cache = []
@@ -571,9 +585,6 @@ class FaceAttendanceApp:
         self.name_time_pause = [[datetime.min] * len(self.fr.class_names), [datetime.min] * len(self.fr.class_names)]
         self.green_box_counter = [[0] * len(self.fr.class_names), [0] * len(self.fr.class_names)]
         self.fr.set_params(self.min_face, self.accuracy_th)
-
-        # self.stop_update_frame_facerecog = False
-        # self.update_frame_facerecog()
         self.start_face_recog()
 
     def btnTrainPressed(self):
@@ -594,8 +605,6 @@ class FaceAttendanceApp:
         if not self.is_record:
             self.disable_buttons()
             self.image_buffer.clear()
-            # self.printProgressBar(0, self.record_total, prefix='Progress:', suffix='Complete', length=50)
-            # time.sleep(0.1)
             self.is_record = True
 
     def resize_frame(self, event):
@@ -651,9 +660,9 @@ class FaceAttendanceApp:
     def cbb_chose_name_clicked(self, event):
         name_list = []
         with engine.connect() as con:
-            rs = con.execute('''SELECT DISTINCT name FROM Timekeeping''')
+            rs = con.execute('''SELECT DISTINCT name, employeeID FROM Timekeeping''')
             for row in rs:
-                name_list.append(list(row)[0])
+                name_list.append(list(row)[0] + '_ID_' + list(row)[1])
         self.cbb_chose_name['values'] = name_list
         self.cbb_chose_name['values'] = (*self.cbb_chose_name['values'], 'All')
 
@@ -734,7 +743,7 @@ class FaceAttendanceApp:
                                     if index not in self.name_last_frame[j]:
                                         self.name_counter[j][index] = 0
                                     self.name_counter[j][index] += 1
-                                if self.name_counter[j][index] >= 6:
+                                if self.name_counter[j][index] >= 3:
                                     if j == self.cam_in_idx:
                                         status = self.lbl_facerecog_in['text']
                                         stt = 'in'
@@ -750,14 +759,15 @@ class FaceAttendanceApp:
                                                                        (160, 160))
                                         text_to_speak = '{} {}'.format(languages[self.lang]['tts_goodbye'],
                                                                        name.split('_ID_')[0])
-                                    self.write('\n' + name.replace('_ID_',
-                                                                   ' ') + '\t' + status + '\n' + datetime.now().strftime(
+                                    self.write('\n' + name.replace('_ID_',' ') + '\n' + status + '\n' + datetime.now().strftime(
                                         "%Y-%m-%d, %H:%M")
                                                + '\n' + '_' * self.txt_notify['width'], out='notify')
                                     if thumbnail is not None:
-                                        cv2.imwrite(
-                                            'images/data/log/' + name + '_' + stt + '_' + datetime.now().strftime(
-                                                "%Y-%m-%d_%H-%M" + '.jpg'), thumbnail)
+                                        thumbnail_path = 'images/data/log/' + name + '_' + stt + '_' + datetime.now().strftime(
+                                            "%Y-%m-%d_%H-%M") + '.jpg'
+                                        is_success, im_buf_arr = cv2.imencode(".jpg", thumbnail)
+                                        if is_success:
+                                            im_buf_arr.tofile(thumbnail_path)
                                     if self.mute_tts:
                                         pygame.mixer.music.play()
                                     else:
@@ -781,20 +791,19 @@ class FaceAttendanceApp:
                                     self.green_box_counter[j][index] = 0
                                     self.name_time_pause[j][index] = datetime.min
                     self.name_last_frame[j] = list_index
-
-            self.fr.draw_frame(frame_in, self.last_boxes[self.cam_in_idx], self.last_texts[self.cam_in_idx],
-                               color=self.last_colors[self.cam_in_idx], thick=2,
-                               text_scale=1, skip_list=self.skip_list[self.cam_in_idx])  # RGB
             w = self.canvas_facerecog_in.winfo_width()
             h = self.canvas_facerecog_in.winfo_height()
-            # self.photo = ImageTk.PhotoImage(image=ImagePIL.fromarray(frame_in).resize((w, h)))
-            self.photo_in = ImageTk.PhotoImage(image=self.resize_with_pad(ImagePIL.fromarray(frame_in), (w, h)))
+            frame_in_pil = self.fr.draw_frame_pil(frame_in, self.last_boxes[self.cam_in_idx],
+                                                  self.last_texts[self.cam_in_idx],
+                                                  color=self.last_colors[self.cam_in_idx], thick=4,
+                                                  skip_list=self.skip_list[self.cam_in_idx])
+            self.photo_in = ImageTk.PhotoImage(image=self.resize_with_pad(frame_in_pil, (w, h)))
             self.canvas_facerecog_in.create_image(0, 0, image=self.photo_in, anchor='nw')
-            self.fr.draw_frame(frame_out, self.last_boxes[self.cam_out_idx], self.last_texts[self.cam_out_idx],
-                               color=self.last_colors[self.cam_out_idx],
-                               thick=2,
-                               text_scale=1, skip_list=self.skip_list[self.cam_out_idx])  # RGB
-            self.photo_out = ImageTk.PhotoImage(image=self.resize_with_pad(ImagePIL.fromarray(frame_out), (w, h)))
+            frame_out_pil = self.fr.draw_frame_pil(frame_out, self.last_boxes[self.cam_out_idx],
+                                                   self.last_texts[self.cam_out_idx],
+                                                   color=self.last_colors[self.cam_out_idx], thick=4,
+                                                   skip_list=self.skip_list[self.cam_out_idx])
+            self.photo_out = ImageTk.PhotoImage(image=self.resize_with_pad(frame_out_pil, (w, h)))
             self.canvas_facerecog_out.create_image(0, 0, image=self.photo_out, anchor='nw')
         self.root.after(20, self.update_frame_facerecog)
 
@@ -814,7 +823,6 @@ class FaceAttendanceApp:
                 time.sleep(0.5)
             w = self.canvas_addface.winfo_width()
             h = self.canvas_addface.winfo_height()
-            # self.photo = ImageTk.PhotoImage(image=ImagePIL.fromarray(frame).resize((w, h)))
             self.photo_in = ImageTk.PhotoImage(image=self.resize_with_pad(ImagePIL.fromarray(frame), (w, h)))
             self.canvas_addface.create_image(0, 0, image=self.photo_in, anchor='nw')
             if self.record_count >= self.record_total:
@@ -822,15 +830,13 @@ class FaceAttendanceApp:
                 self.record_count = 0
                 self.popup_input_frame()
                 self.enable_buttons()
+        else:
+            if self.is_record:
+                self.is_record = False
+                self.record_count = 0
+                self.popup_input_frame()
+                self.enable_buttons()
         self.root.after(20, self.update_frame_addface)
-
-    # def btn_FaceRecog_pressed(self):
-    #     if self.is_running_fr:
-    #         self.stop_face_recog()
-    #         self.btnFaceRecog.configure(text='Start')
-    #     else:
-    #         self.start_face_recog()
-    #         self.btnFaceRecog.configure(text='Stop')
 
     # Print to console text box
     def write(self, *message, end="\n", sep=" ", out='console'):
@@ -840,30 +846,36 @@ class FaceAttendanceApp:
             text += sep
         text += end
         if out == 'console':
-            self.txt_console.insert(INSERT, text)
+            self.txt_console.configure(state='normal')
+            self.txt_console.insert(END, text)
             self.txt_console.see("end")
+            self.txt_console.configure(state='disable')
         if out == 'notify':
-            self.txt_notify.insert(INSERT, text)
+            self.txt_notify.configure(state='normal')
+            self.txt_notify.insert(END, text)
             self.txt_notify.see("end")
+            self.txt_notify.configure(state='disable')
 
     # Save image to folder
     def save_image(self):
         if self.image_folder_name == '':
             return
         self.get_employee_from_db()
-        if self.image_folder_name.split('_ID_')[1] not in self.emp_id_list:
-            self.update_employee(self.image_folder_name.split('_ID_')[0], self.image_folder_name.split('_ID_')[1])
+        emp_id = self.image_folder_name.split('_ID_')[1]
+        emp_name = self.image_folder_name.split('_ID_')[0]
+        if emp_id not in self.emp_id_list:
+            self.update_employee(emp_name, emp_id, self.emp_notify_lang)
         image_folder = os.path.join(self.data_folder, self.image_folder_name)
         self.write(languages[self.lang]['msg_save_image'] + image_folder)
-        self.modified_folder.append(self.image_folder_name)
+        if self.image_folder_name not in self.modified_folder:
+            self.modified_folder.append(self.image_folder_name)
         if not os.path.exists(image_folder):
             os.mkdir(image_folder)
         for i, image in enumerate(self.image_buffer):
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            cv2.imwrite(
-                image_folder + '/{}_{}_{}.jpg'.format(self.image_folder_name,
-                                                      datetime.now().strftime("%Y-%m-%d-%H-%M-%S"), i), image)
-
+            image_path = image_folder + '/{}_{}_{}.jpg'.format(emp_id, datetime.now().strftime("%Y-%m-%d-%H-%M-%S"), i)
+            is_success, im_buf_arr = cv2.imencode(".jpg", image)
+            im_buf_arr.tofile(image_path)
         thread = threading.Thread(target=self.create_images_with_masks, args=(image_folder,), daemon=True)
         thread.start()
 
@@ -871,8 +883,9 @@ class FaceAttendanceApp:
     def create_images_with_masks(self, image_folder):
         try:
             filenames = glob.glob(image_folder + '/*.jpg')
-            images = [cv2.imread(img) for img in filenames]
-            masks = [cv2.imread('images/masks/fm1.png'), cv2.imread('images/masks/fm2.png')]
+            images = [cv2.imdecode(np.fromfile(img, np.uint8), cv2.IMREAD_UNCHANGED) for img in filenames]
+            masks_filenames = glob.glob('images/masks' + '/*.png')
+            masks = [cv2.imread(mask_img) for mask_img in masks_filenames]
             self.write(languages[self.lang]['msg_gen_face_mask'])
             for idx, img in enumerate(images):
                 try:
@@ -880,7 +893,9 @@ class FaceAttendanceApp:
                     if os.path.exists(out_path):
                         continue
                     out_img = add_face_mask(img, masks[idx % len(masks)])
-                    cv2.imwrite(out_path, out_img)
+                    is_success, im_buf_arr = cv2.imencode(".png", out_img)
+                    if is_success:
+                        im_buf_arr.tofile(out_path)
                     self.write('\t{}/{}'.format(idx + 1, len(images)))
                 except Exception as ex:
                     self.write('\t{}/{} ERROR face out side of image'.format(idx + 1, len(images)))
@@ -891,9 +906,10 @@ class FaceAttendanceApp:
             self.write('ERROR ' + str(ex))
             return
 
-    def get_person_name(self, name, name_id):
+    def get_person_name(self, name, name_id, notify_lang):
         if name == '' or name_id == '':
             self.image_folder_name = ''
+            self.emp_notify_lang = ''
             self.write(languages[self.lang]['err_name_empty'])
             return
         self.get_employee_from_db()
@@ -905,8 +921,8 @@ class FaceAttendanceApp:
                 return
         except ValueError:
             pass
-
         self.image_folder_name = name + '_ID_' + name_id
+        self.emp_notify_lang = notify_lang
 
     # Stop face recognition engine
     def stop_face_recog(self):
@@ -1047,8 +1063,11 @@ class FaceAttendanceApp:
                                 '''.format(checkOut, last, work, rest, OT, emp_id, date_str))
 
     @staticmethod
-    def update_employee(emp_name, emp_id):
-        record = Employee(name=emp_name, id=emp_id)
+    def update_employee(emp_name, emp_id, emp_notify_lang):
+        if emp_notify_lang == '':
+            record = Employee(name=emp_name, id=emp_id)
+        else:
+            record = Employee(name=emp_name, id=emp_id, language=emp_notify_lang)
         session.add(record)
         session.commit()
 
@@ -1109,6 +1128,6 @@ if __name__ == '__main__':
     if len(device_list) < 2:
         print('Error: Not enough camera')
         # time.sleep(5)
-        exit()
+        # exit()
     app = FaceAttendanceApp()
     app.run()

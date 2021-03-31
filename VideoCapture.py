@@ -9,7 +9,8 @@ class MyVideoCapture:
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         if not self.cap.isOpened():
-            raise ValueError('Unable to open this camera', video_source)
+            # raise ValueError('Unable to open this camera', video_source)
+            print('Unable to open this camera', video_source)
 
         self.width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         self.height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)

@@ -9,7 +9,7 @@ Base = declarative_base()
 class Attendance(Base):
     __tablename__ = 'Attendance'
     id = Column(Integer, primary_key=True)
-    employeeID = Column(Integer)
+    employeeID = Column(String(10))
     name = Column(String(250), nullable=False)
     date = Column(Date, nullable=False)
     time = Column(String(50), nullable=False)
@@ -19,7 +19,7 @@ class Attendance(Base):
 class Timekeeping(Base):
     __tablename__ = 'Timekeeping'
     id = Column(Integer, primary_key=True)
-    employeeID = Column(Integer)
+    employeeID = Column(String(10))
     name = Column(String(250), nullable=False)
     date = Column(Date, nullable=False)
     checkIn = Column(String(50))
@@ -34,6 +34,7 @@ class Employee(Base):
     __tablename__ = 'Employee'
     id = Column(String(10), primary_key=True)
     name = Column(String(250), nullable=False)
+    language = Column(String(20), default='VN')
 
 
 # Link to database

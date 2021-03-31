@@ -5,6 +5,8 @@ import numpy as np
 import threading
 import os
 import glob
+import time
+from PIL import ImageFont, ImageDraw, Image
 
 
 class FaceRecognition:
@@ -48,13 +50,16 @@ class FaceRecognition:
             self.accuracy_th = accuracy_th
 
     def load_model(self, path=''):
-        if path != '' and os.path.isfile(path):
-            with open(path, 'rb') as infile:
-                (self.model, self.class_names) = pickle.load(infile)
-        else:
-            if os.path.exists(self.model_path):
-                with open(self.model_path, 'rb') as infile:
+        try:
+            if path != '' and os.path.isfile(path):
+                with open(path, 'rb') as infile:
                     (self.model, self.class_names) = pickle.load(infile)
+            else:
+                if os.path.exists(self.model_path):
+                    with open(self.model_path, 'rb') as infile:
+                        (self.model, self.class_names) = pickle.load(infile)
+        except Exception:
+            return
 
     # Draw bounding box and text on image
     @staticmethod
@@ -101,6 +106,38 @@ class FaceRecognition:
                     # cv2.circle(image, (int(left_ear[0]), int(left_ear[1])), 2, (255, 255, 255), 2)
                     # cv2.circle(image, (int(right_ear[0]), int(right_ear[1])), 2, (255, 255, 255), 2)
 
+    @staticmethod
+    def draw_frame_pil(image, bounding_boxes, label_texts=None,
+                       landmarks=None, face_mask_anchor=False, color=None, thick=2, text_scale=0.5, skip_list=None):
+        if skip_list is None:
+            skip_list = []
+        if landmarks is None:
+            landmarks = []
+        if color is None:
+            color = []
+        if label_texts is None:
+            label_texts = []
+        if bounding_boxes is None:
+            return
+        if not color:
+            color = [(255, 255, 0)] * len(bounding_boxes)
+        img_pil = Image.fromarray(image)
+        width, height = img_pil.size
+        try:
+            for i, box in enumerate(bounding_boxes):
+                if i in skip_list:
+                    continue
+                if len(box) < 4:
+                    continue
+                draw = ImageDraw.Draw(img_pil)
+                draw.rectangle([(int(box[0]), int(box[1])), (int(box[2]), int(box[3]))], outline=color[i], width=thick)
+                font = ImageFont.truetype('arial.ttf', int(height/15))
+                draw.text((int(box[0]), int(box[1]) - int(height/15)), label_texts[i].replace('_', ' '), font=font, fill=color[i])
+        except Exception as ex:
+            print('ERROR: draw_frame_pil ' + str(ex))
+            pass
+        return img_pil
+
     # Detect face on image and match with classify model, update result to bounding boxes and texts
     def face_match(self, image, classify_model, person_names, cam_id):
         box_dr = []
@@ -112,17 +149,20 @@ class FaceRecognition:
             with self.lock_boxes:
                 self.box_draw[cam_id] = box_dr
                 self.text_draw[cam_id] = text_dr
+            time.sleep(0.5)
             return box_dr, text_dr, mark_dr
         if bboxes is None:
             with self.lock_boxes:
                 self.box_draw[cam_id] = box_dr
                 self.text_draw[cam_id] = text_dr
+            time.sleep(0.5)
             return box_dr, text_dr, mark_dr
         for idx, box in enumerate(bboxes):
             if prob[idx] > 0.90:  # if face detected and probability > 90%
                 box_dr.append(box)
                 mark_dr.append(landmarks[idx])
-                face = extract_face(image, box, image_size=self.mtcnn_pt[cam_id].image_size, margin=self.mtcnn_pt[cam_id].margin)
+                face = extract_face(image, box, image_size=self.mtcnn_pt[cam_id].image_size,
+                                    margin=self.mtcnn_pt[cam_id].margin)
                 face = fixed_image_standardization(face)
                 emb = self.resnet(face.unsqueeze(0))  # passing cropped face into resnet model to get embedding matrix
                 emb_array = emb.detach().numpy()
@@ -176,57 +216,52 @@ class FaceRecognition:
         with self.lock_flag:
             self.stop_flag[0] = True
 
-        # with self.lock_boxes:
-        #     self.box_draw = []
-        #     self.text_draw = []
-        #     self.mark_draw = []
-
     # Sample to implement with camera
-    def face_recog_cam(self):
-        thread = threading.Thread(target=self.thread_face_recog, args=(), daemon=True)
-        thread.start()
-        while True:
-            # Capture frame-by-frame
-            with self.lock_cap:
-                ret, frame = self.cap.read()
-
-            with self.lock_boxes:
-                boxes = self.box_draw[0]
-                texts = self.text_draw[0]
-                # marks = self.mark_draw[0]
-
-            self.draw_frame(frame, boxes, texts)
-
-            # frame = add_face_mask(frame, mask)
-            # Display the resulting frame
-            cv2.imshow('frame', frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-
-    # Sample with image folder or file
-    def face_recog_image(self, path):
-        if not os.path.exists(path):
-            return
-        if os.path.isfile(path):
-            image = cv2.imread(path)
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            bboxes, texts, marks = self.face_match(image, self.model, self.class_names)
-            self.draw_frame(image, bboxes, texts)
-            cv2.imshow('', image)
-            cv2.waitKey()
-            cv2.destroyWindow('')
-
-        if os.path.isdir(path):
-            filenames = glob.glob(path + '/*.jpg')
-            images = [cv2.imread(img) for img in filenames]
-            for idx, img in enumerate(images):
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                bboxes, texts, marks = self.face_match(img, self.model, self.class_names)
-                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-                self.draw_frame(img, bboxes, texts)
-                cv2.imshow(str(idx), img)
-                cv2.waitKey()
-                cv2.destroyWindow(str(idx))
+    # def face_recog_cam(self):
+    #     thread = threading.Thread(target=self.thread_face_recog, args=(), daemon=True)
+    #     thread.start()
+    #     while True:
+    #         # Capture frame-by-frame
+    #         with self.lock_cap:
+    #             ret, frame = self.cap.read()
+    #
+    #         with self.lock_boxes:
+    #             boxes = self.box_draw[0]
+    #             texts = self.text_draw[0]
+    #             # marks = self.mark_draw[0]
+    #
+    #         self.draw_frame(frame, boxes, texts)
+    #
+    #         # frame = add_face_mask(frame, mask)
+    #         # Display the resulting frame
+    #         cv2.imshow('frame', frame)
+    #         if cv2.waitKey(1) & 0xFF == ord('q'):
+    #             break
+    #
+    # # Sample with image folder or file
+    # def face_recog_image(self, path):
+    #     if not os.path.exists(path):
+    #         return
+    #     if os.path.isfile(path):
+    #         image = cv2.imread(path)
+    #         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    #         bboxes, texts, marks = self.face_match(image, self.model, self.class_names)
+    #         self.draw_frame(image, bboxes, texts)
+    #         cv2.imshow('', image)
+    #         cv2.waitKey()
+    #         cv2.destroyWindow('')
+    #
+    #     if os.path.isdir(path):
+    #         filenames = glob.glob(path + '/*.jpg')
+    #         images = [cv2.imread(img) for img in filenames]
+    #         for idx, img in enumerate(images):
+    #             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    #             bboxes, texts, marks = self.face_match(img, self.model, self.class_names)
+    #             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    #             self.draw_frame(img, bboxes, texts)
+    #             cv2.imshow(str(idx), img)
+    #             cv2.waitKey()
+    #             cv2.destroyWindow(str(idx))
 
     def __del__(self):
         cv2.destroyAllWindows()
