@@ -17,6 +17,7 @@ class FaceClassifier:
         self.label_list = []
         self.class_list = []
         self.pretrained_path = 'data.pt'
+        self.out_model_path = 'classify_model.pkl'
 
     def load_pretrained_data(self, model_path):
         if not os.path.exists(model_path):
@@ -129,3 +130,44 @@ class FaceClassifier:
         with open(out_model, 'wb') as outfile:
             pickle.dump((model, idx_to_class), outfile)
         outtext('Saved classifier model to file "%s"' % out_model)
+
+    def change_name(self, emp_id, new_name):
+        self.load_pretrained_data(self.pretrained_path)
+        new_label = new_name + '_ID_' + emp_id
+        for idx, item in enumerate(self.label_list):
+            if item.split('_ID_')[1] == emp_id:
+                self.label_list[idx] = new_label
+        self.class_list = list(OrderedDict.fromkeys(self.label_list))
+        data = [self.embedding_list, self.label_list]
+        torch.save(data, 'data.pt')  # saving data.pt file
+
+    # def delete_name(self, emp_id):
+    #     self.load_pretrained_data(self.pretrained_path)
+    #     if len(self.embedding_list) == 0:
+    #         return
+    #     rmv_idx = []
+    #     rmv_idx.clear()
+    #     for idx, label in enumerate(self.label_list):
+    #         if label.split('_ID_')[1] == emp_id:
+    #             rmv_idx.append(idx)
+    #     if len(rmv_idx) == 0:
+    #         return
+    #     self.embedding_list = [i for j, i in enumerate(self.embedding_list) if j not in rmv_idx]
+    #     self.label_list = [i for j, i in enumerate(self.label_list) if j not in rmv_idx]
+    #     self.class_list = list(OrderedDict.fromkeys(self.label_list))
+    #     data = [self.embedding_list, self.label_list]
+    #     torch.save(data, 'data.pt')  # saving data.pt file
+    #     cvt_embedding_list = []
+    #     for tensor in self.embedding_list:
+    #         cvt_embedding_list.append(tensor.numpy()[0])
+    #     model = SVC(kernel='linear', probability=True)
+    #     try:
+    #         model.fit(cvt_embedding_list, self.label_list)
+    #     except ValueError as ve:
+    #         return
+    #     # Saving classifier model
+    #     class_dict = {}
+    #     for idx, item in enumerate(self.class_list):
+    #         class_dict[idx] = item
+    #     with open(self.out_model_path, 'wb') as outfile:
+    #         pickle.dump((model, class_dict), outfile)

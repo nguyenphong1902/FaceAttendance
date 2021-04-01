@@ -213,37 +213,51 @@ class FaceAttendanceApp:
         self.canvas_addface = Canvas(self.left_frame_addface, width=300, height=300, bg='black')
         self.canvas_addface.pack(fill=BOTH, expand=YES)
 
+        self.fr_training = LabelFrame(self.right_frame_addface, text=languages[self.lang]['lblfr_training'])
+        self.fr_training.grid(row=0, column=0, sticky=N+S+W+E)
         self.cam_capture_id = StringVar()
-        self.cbb_chose_cam_capture = ttk.Combobox(self.right_frame_addface, width=12, textvariable=self.cam_capture_id)
+        self.cbb_chose_cam_capture = ttk.Combobox(self.fr_training, width=12, textvariable=self.cam_capture_id)
         if len(device_list) >= 2:
             self.cam_capture_id.set('0-' + device_list[0])
             self.cbb_chose_cam_capture['values'] = ('0-' + device_list[0], '1-' + device_list[1])
         self.cbb_chose_cam_capture.bind('<<ComboboxSelected>>', self.cam_capture_id_changed)
         self.cbb_chose_cam_capture.grid(row=0, column=0)
-        self.lblRecord = Label(self.right_frame_addface, text=languages[self.lang]['lbl_record'])
-        self.lblRecord.grid(row=1, column=0, sticky=E)
-        self.entrRecord = Entry(self.right_frame_addface, width=4, borderwidth=2)
+        self.lblRecord = Label(self.fr_training, text=languages[self.lang]['lbl_record'])
+        self.lblRecord.grid(row=1, column=0)
+        self.entrRecord = Entry(self.fr_training, width=4, borderwidth=2)
         self.entrRecord.insert(END, str(self.record_total))
-        self.entrRecord.grid(row=1, column=1, sticky=N, pady=10)
-        self.btnRecord = ttk.Button(self.right_frame_addface, text=languages[self.lang]['btn_record'],
+        self.entrRecord.grid(row=1, column=1, pady=10 ,sticky=W)
+        self.btnRecord = ttk.Button(self.fr_training, text=languages[self.lang]['btn_record'],
                                     command=self.btnRecordPressed)
-        self.btnRecord.grid(row=2, column=0, sticky=N, pady=10, columnspan=2)
-        self.btnTrain = ttk.Button(self.right_frame_addface, text=languages[self.lang]['btn_train'],
+        self.btnRecord.grid(row=2, column=0, pady=10, columnspan=2)
+        self.btnTrain = ttk.Button(self.fr_training, text=languages[self.lang]['btn_train'],
                                    command=self.btnTrainPressed)
-        self.btnTrain.grid(row=3, column=0, sticky=S, pady=10, columnspan=2)
-        self.btnReTrainAll = ttk.Button(self.right_frame_addface, text=languages[self.lang]['btn_retrain_all'],
+        self.btnTrain.grid(row=3, column=0, pady=10, columnspan=2)
+        self.btnReTrainAll = ttk.Button(self.fr_training, text=languages[self.lang]['btn_retrain_all'],
                                         command=self.btnReTrainAllPressed)
-        self.btnReTrainAll.grid(row=4, column=0, sticky=S, pady=10, columnspan=2)
-        self.btnDelete = ttk.Button(self.right_frame_addface, text=languages[self.lang]['btn_delete'],
+        self.btnReTrainAll.grid(row=4, column=0, pady=10, columnspan=2)
+        self.fr_training.columnconfigure(0, weight=1)
+        self.fr_training.columnconfigure(1, weight=1)
+
+        self.fr_employee_edit = LabelFrame(self.right_frame_addface, text=languages[self.lang]['fr_employee_edit'])
+        self.fr_employee_edit.grid(row=1, column=0, sticky=N+S+W+E)
+        self.lbl_employee = Label(self.fr_employee_edit, text=languages[self.lang]['lbl_employee'])
+        self.lbl_employee.grid(row=0, column=0, pady=10)
+        self.btnDelete = ttk.Button(self.fr_employee_edit, text=languages[self.lang]['btn_delete'],
                                     command=self.btnDeletePressed)
-        self.btnDelete.grid(row=5, column=0, pady=10)
+        self.btnDelete.grid(row=1, column=0, pady=10)
+        self.btnChangeName = ttk.Button(self.fr_employee_edit, text=languages[self.lang]['btn_change_name'],
+                                    command=self.btnChangeNamePressed)
+        self.btnChangeName.grid(row=1, column=1, pady=10)
         self.name_to_del = StringVar()
-        self.cbb_chose_delete = ttk.Combobox(self.right_frame_addface, width=18, textvariable=self.name_to_del)
+        self.cbb_chose_delete = ttk.Combobox(self.fr_employee_edit, width=18, textvariable=self.name_to_del)
         self.cbb_chose_delete['values'] = [name for name in os.listdir(self.data_folder) if
                                            os.path.isdir(os.path.join(self.data_folder, name))]
         self.cbb_chose_delete.bind('<Button-1>', self.on_cbb_del_clicked)
-        self.cbb_chose_delete.grid(row=5, column=1, pady=10)
-
+        self.cbb_chose_delete.grid(row=0, column=1, pady=10)
+        self.right_frame_addface.rowconfigure(0, weight=1)
+        self.right_frame_addface.rowconfigure(1, weight=1)
+        self.right_frame_addface.columnconfigure(0, weight=1)
         self.scroll_console = Scrollbar(self.bottom_frame_addface, orient=VERTICAL)
         self.scroll_console.pack(side=RIGHT, fill=Y)
         self.txt_console = Text(self.bottom_frame_addface, bg='black', fg='white', height=7,
@@ -295,17 +309,21 @@ class FaceAttendanceApp:
         self.tabAttendance.columnconfigure(0, weight=1)
 
     # Popup
-    def popup_input_frame(self):
+    def popup_input_frame(self, mode='add_new', emp_id=''):
         input_name = Toplevel()
-        input_name.wm_title(languages[self.lang]['popup_input_name_title'])
+        if mode == 'add_new':
+            input_name.wm_title(languages[self.lang]['popup_input_name_title'])
+        if mode == 'change_name':
+            input_name.wm_title(languages[self.lang]['btn_change_name'])
         lab = Label(input_name, text=languages[self.lang]['popup_lbl_input_name'], borderwidth=2)
         lab.grid(row=0, column=0, padx=10, pady=10)
         txtBox = Entry(input_name, width=20, borderwidth=2)
         txtBox.grid(row=0, column=1, padx=10, pady=10)
-        lab_id = Label(input_name, text='ID', borderwidth=2)
-        lab_id.grid(row=0, column=2, padx=10, pady=10)
-        txtBox_id = Entry(input_name, width=20, borderwidth=2)
-        txtBox_id.grid(row=0, column=3, padx=10, pady=10)
+        if mode == 'add_new':
+            lab_id = Label(input_name, text='ID', borderwidth=2)
+            lab_id.grid(row=0, column=2, padx=10, pady=10)
+            txtBox_id = Entry(input_name, width=20, borderwidth=2)
+            txtBox_id.grid(row=0, column=3, padx=10, pady=10)
         lbl_notify_lang = Label(input_name, text=languages[self.lang]['lbl_language'])
         lbl_notify_lang.grid(row=0, column=4, sticky=E)
         notify_lang = StringVar()
@@ -313,12 +331,16 @@ class FaceAttendanceApp:
         cbb_notify_lang['values'] = list(self.lang_options)
         notify_lang.set('VN')
         cbb_notify_lang.grid(row=0, column=5, pady=10)
-
-        btnOkay = ttk.Button(input_name, text=languages[self.lang]['popup_btn_okay'],
-                             command=lambda: [self.get_person_name(txtBox.get(), txtBox_id.get(), notify_lang.get()),
-                                              input_name.destroy(),
-                                              self.save_image()])
-        btnOkay.grid(row=1, column=3, padx=10, pady=10, sticky=E)
+        if mode == 'add_new':
+            btnOkay = ttk.Button(input_name, text=languages[self.lang]['popup_btn_okay'],
+                                 command=lambda: [self.get_person_name(txtBox.get(), txtBox_id.get(), notify_lang.get()),
+                                                  input_name.destroy(), self.save_image()])
+            btnOkay.grid(row=1, column=3, padx=10, pady=10, sticky=E)
+        if mode == 'change_name':
+            btnOkay = ttk.Button(input_name, text=languages[self.lang]['btn_change_name'],
+                                 command=lambda: [self.update_employee(txtBox.get(), emp_id, notify_lang.get()),
+                                                  input_name.destroy()])
+            btnOkay.grid(row=1, column=1, padx=10, pady=10, sticky=E)
         btnCancel = ttk.Button(input_name, text=languages[self.lang]['popup_btn_cancel'], command=input_name.destroy)
         btnCancel.grid(row=1, column=5, padx=10, pady=10, sticky=E)
         w = self.root.winfo_width()
@@ -510,15 +532,26 @@ class FaceAttendanceApp:
         if folder == '':
             return
         try:
-            shutil.rmtree(os.path.join(self.data_folder, folder))
             emp_id = self.name_to_del.get().split('_ID_')[1]
             with engine.connect() as con:
                 con.execute('''DELETE FROM Employee WHERE id = '{}' '''.format(emp_id))
+                con.execute('''DELETE FROM Attendance WHERE employeeID = '{}' '''.format(emp_id))
+                con.execute('''DELETE FROM Timekeeping WHERE employeeID = '{}' '''.format(emp_id))
             self.write('Delete successful: {}'.format(os.path.join(self.data_folder, folder)))
+            shutil.rmtree(os.path.join(self.data_folder, folder))
             if folder in self.modified_folder:
                 self.modified_folder.remove(folder)
+            self.btnTrainPressed()
         except OSError as e:
             self.write("Error: %s - %s." % (e.filename, e.strerror))
+
+    def btnChangeNamePressed(self):
+        try:
+            emp_id = self.cbb_chose_delete.get().split('_ID_')[1]
+        except Exception:
+            self.write('Wrong format, no employee found')
+            return
+        self.popup_input_frame(mode='change_name', emp_id=emp_id)
 
     def btnCamSettingsPressed(self):
         if self.settings is None or not self.settings.winfo_exists():
@@ -625,11 +658,13 @@ class FaceAttendanceApp:
         self.btnRecord['state'] = 'disable'
         self.btnReTrainAll['state'] = 'disable'
         self.btnDelete['state'] = 'disable'
+        self.btnChangeName['state'] = 'disable'
 
     def enable_buttons(self):
         self.btnTrain['state'] = 'normal'
         self.btnRecord['state'] = 'normal'
         self.btnDelete['state'] = 'normal'
+        self.btnChangeName['state'] = 'normal'
         self.btnReTrainAll['state'] = 'normal'
         self.tabControl.tab(0, state='normal')
         self.tabControl.tab(2, state='normal')
@@ -641,6 +676,14 @@ class FaceAttendanceApp:
         if tab_text == languages[self.lang]['tab_facerecog']:
             self.stop_update_frame_addface = True
             self.stop_update_frame_facerecog = False
+            self.fr.load_model()
+            self.name_cache = []
+            for key, value in self.fr.class_names.items():
+                self.name_cache.append(value)
+            self.name_counter = [[0] * len(self.fr.class_names), [0] * len(self.fr.class_names)]
+            self.name_time_pause = [[datetime.min] * len(self.fr.class_names),
+                                    [datetime.min] * len(self.fr.class_names)]
+            self.green_box_counter = [[0] * len(self.fr.class_names), [0] * len(self.fr.class_names)]
             self.update_frame_facerecog()
             self.start_face_recog()
         if tab_text == languages[self.lang]['tab_addface']:
@@ -654,8 +697,13 @@ class FaceAttendanceApp:
             self.stop_update_frame_addface = True
 
     def on_cbb_del_clicked(self, event):
-        self.cbb_chose_delete['values'] = [name for name in os.listdir(self.data_folder) if
-                                           os.path.isdir(os.path.join(self.data_folder, name))]
+        self.get_employee_from_db()
+        list_emp = []
+        for i, emp_id in enumerate(self.emp_id_list):
+            list_emp.append(self.emp_name_list[i] + '_ID_' + emp_id)
+        # self.cbb_chose_delete['values'] = [name for name in os.listdir(self.data_folder) if
+        #                                    os.path.isdir(os.path.join(self.data_folder, name))]
+        self.cbb_chose_delete['value'] = list_emp
 
     def cbb_chose_name_clicked(self, event):
         name_list = []
@@ -702,6 +750,10 @@ class FaceAttendanceApp:
         self.lbl_chose_name['text'] = languages[self.lang]['lbl_name']
         self.btnDelete['text'] = languages[self.lang]['btn_delete']
         self.chkbtn_mute_tts['text'] = languages[self.lang]['chkbtn_mute_tts']
+        self.fr_employee_edit['text'] = languages[self.lang]['fr_employee_edit']
+        self.fr_training['text'] = languages[self.lang]['lblfr_training']
+        self.lbl_employee['text'] = languages[self.lang]['lbl_employee']
+        self.btnChangeName['text'] = languages[self.lang]['btn_change_name']
 
     # Update frame face recognition
     def update_frame_facerecog(self):
@@ -749,17 +801,13 @@ class FaceAttendanceApp:
                                         stt = 'in'
                                         thumbnail = self.get_thumbnail(frame_in, self.last_boxes[self.cam_in_idx][idx],
                                                                        (160, 160))
-                                        text_to_speak = '{} {}'.format(languages[self.lang]['tts_hello'],
-                                                                       name.split('_ID_')[0])
                                     else:
                                         status = self.lbl_facerecog_out['text']
                                         stt = 'out'
                                         thumbnail = self.get_thumbnail(frame_out,
                                                                        self.last_boxes[self.cam_out_idx][idx],
                                                                        (160, 160))
-                                        text_to_speak = '{} {}'.format(languages[self.lang]['tts_goodbye'],
-                                                                       name.split('_ID_')[0])
-                                    self.write('\n' + name.replace('_ID_',' ') + '\n' + status + '\n' + datetime.now().strftime(
+                                    self.write('\n' + name.replace('_ID_', ' ') + '\n' + status + '\n' + datetime.now().strftime(
                                         "%Y-%m-%d, %H:%M")
                                                + '\n' + '_' * self.txt_notify['width'], out='notify')
                                     if thumbnail is not None:
@@ -771,7 +819,7 @@ class FaceAttendanceApp:
                                     if self.mute_tts:
                                         pygame.mixer.music.play()
                                     else:
-                                        thread_speak = threading.Thread(target=self.speak, args=(text_to_speak,),
+                                        thread_speak = threading.Thread(target=self.speak, args=(name, stt,),
                                                                         daemon=True)
                                         thread_speak.start()
                                     self.update_attendant(name, datetime.now(), stt)
@@ -828,13 +876,13 @@ class FaceAttendanceApp:
             if self.record_count >= self.record_total:
                 self.is_record = False
                 self.record_count = 0
-                self.popup_input_frame()
+                self.popup_input_frame(mode='add_new')
                 self.enable_buttons()
         else:
             if self.is_record:
                 self.is_record = False
                 self.record_count = 0
-                self.popup_input_frame()
+                self.popup_input_frame(mode='add_new')
                 self.enable_buttons()
         self.root.after(20, self.update_frame_addface)
 
@@ -864,7 +912,7 @@ class FaceAttendanceApp:
         emp_id = self.image_folder_name.split('_ID_')[1]
         emp_name = self.image_folder_name.split('_ID_')[0]
         if emp_id not in self.emp_id_list:
-            self.update_employee(emp_name, emp_id, self.emp_notify_lang)
+            self.add_employee(emp_name, emp_id, self.emp_notify_lang)
         image_folder = os.path.join(self.data_folder, self.image_folder_name)
         self.write(languages[self.lang]['msg_save_image'] + image_folder)
         if self.image_folder_name not in self.modified_folder:
@@ -1063,13 +1111,36 @@ class FaceAttendanceApp:
                                 '''.format(checkOut, last, work, rest, OT, emp_id, date_str))
 
     @staticmethod
-    def update_employee(emp_name, emp_id, emp_notify_lang):
+    def add_employee(emp_name, emp_id, emp_notify_lang):
         if emp_notify_lang == '':
             record = Employee(name=emp_name, id=emp_id)
         else:
             record = Employee(name=emp_name, id=emp_id, language=emp_notify_lang)
         session.add(record)
         session.commit()
+
+    def update_employee(self, emp_name, emp_id, emp_notify_lang):
+        if emp_name == '':
+            return
+        try:
+            with engine.connect() as con:
+                con.execute('''UPDATE Employee SET language = '{0}', name = '{1}' WHERE id = '{2}' '''.format(emp_notify_lang, emp_name, emp_id))
+                con.execute('''UPDATE Timekeeping SET name = '{0}' WHERE employeeID = '{1}' '''.format(emp_name, emp_id))
+                con.execute('''UPDATE Attendance SET name = '{0}' WHERE employeeID = '{1}' '''.format(emp_name, emp_id))
+            self.fr.change_name(emp_id=emp_id, new_name=emp_name)
+            self.fc.change_name(emp_id=emp_id, new_name=emp_name)
+            basedir = self.data_folder
+            for fn in os.listdir(basedir):
+                if not os.path.isdir(os.path.join(basedir, fn)):
+                    continue  # Not a directory
+                if fn.split('_ID_')[1] == emp_id:
+                    os.rename(os.path.join(basedir, fn),
+                              os.path.join(basedir, emp_name + '_ID_' + emp_id))
+
+        except Exception:
+            self.write('ERROR: Change name failed')
+            return
+        self.write('Change name successful')
 
     # Delete records except first and last
     @staticmethod
@@ -1104,16 +1175,28 @@ class FaceAttendanceApp:
                 self.emp_name_list.append(list(row)[1])
                 self.emp_id_list.append(list(row)[0])
 
-    def speak(self, text):
-        if self.lang == 'EN':
-            tts_engine.setProperty('voice', voices[1].id)
-            tts_engine.setProperty('volume', 2)
-        if self.lang == 'VN':
-            tts_engine.setProperty('voice', voices[2].id)
-            tts_engine.setProperty('volume', 1)
-        tts_engine.setProperty('rate', 200)
+    def speak(self, name, stt):
+        emp_id = name.split('_ID_')[1]
+        notify_lang = 'VN'
+        text_to_speak = ''
         with self.speak_lock:
-            tts_engine.say(text)
+            with engine.connect() as con:
+                rs = con.execute('''SELECT language From Employee WHERE id = '{}' '''.format(emp_id))
+                for row in rs:
+                    if len(list(row)) > 0:
+                        notify_lang = list(row)[0]
+            if notify_lang == 'EN':
+                tts_engine.setProperty('voice', voices[1].id)
+                tts_engine.setProperty('volume', 1)
+            if notify_lang == 'VN':
+                tts_engine.setProperty('voice', voices[2].id)
+                tts_engine.setProperty('volume', 0.5)
+            tts_engine.setProperty('rate', 200)
+            if stt == 'out':
+                text_to_speak = '{} {}'.format(languages[notify_lang]['tts_goodbye'], name.split('_ID_')[0])
+            elif stt == 'in':
+                text_to_speak = '{} {}'.format(languages[notify_lang]['tts_hello'], name.split('_ID_')[0])
+            tts_engine.say(text_to_speak)
             tts_engine.runAndWait()
 
     def run(self):
@@ -1127,7 +1210,7 @@ class FaceAttendanceApp:
 if __name__ == '__main__':
     if len(device_list) < 2:
         print('Error: Not enough camera')
-        # time.sleep(5)
-        # exit()
+        time.sleep(5)
+        exit()
     app = FaceAttendanceApp()
     app.run()

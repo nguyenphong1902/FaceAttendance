@@ -216,6 +216,14 @@ class FaceRecognition:
         with self.lock_flag:
             self.stop_flag[0] = True
 
+    def change_name(self, emp_id, new_name):
+        for idx, name in self.class_names.items():
+            if name.split('_ID_')[1] == emp_id:
+                self.class_names[idx] = new_name + '_ID_' + emp_id
+                break
+        with open(self.model_path, 'wb') as outfile:
+            pickle.dump((self.model, self.class_names), outfile)
+
     # Sample to implement with camera
     # def face_recog_cam(self):
     #     thread = threading.Thread(target=self.thread_face_recog, args=(), daemon=True)

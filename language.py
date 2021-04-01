@@ -45,7 +45,11 @@ languages = {
         'btn_delete': 'Delete',
         'tts_hello': 'Hello',
         'tts_goodbye': 'Good bye',
-        'chkbtn_mute_tts': 'Mute speak notification'
+        'chkbtn_mute_tts': 'Mute speak notification',
+        'fr_employee_edit': 'Edit employee',
+        'lblfr_training': 'Training',
+        'lbl_employee': 'Employee',
+        'btn_change_name': 'Change Name'
     },
     'VN': {
         'app_name': 'Điểm mặt',
@@ -93,6 +97,10 @@ languages = {
         'btn_delete': 'Xóa',
         'tts_hello': 'Xin chào',
         'tts_goodbye': 'Tạm biệt',
-        'chkbtn_mute_tts': 'Tắt thông báo giọng nói'
+        'chkbtn_mute_tts': 'Tắt thông báo giọng nói',
+        'fr_employee_edit': 'Sửa thông tin nhân viên',
+        'lblfr_training': 'Training',
+        'lbl_employee': 'Nhân viên',
+        'btn_change_name': 'Đổi tên'
     }
 }

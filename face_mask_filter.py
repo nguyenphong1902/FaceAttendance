@@ -12,6 +12,8 @@ for item in items:
     q = item.Dependent.Caption
     if re.findall("Camera", q):
         device_list.append(q)
+    if re.findall('CAMERA', q):
+        device_list.append(q)
 
 # import device
 # device_list = device.getDeviceList()
